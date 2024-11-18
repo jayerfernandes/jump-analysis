@@ -101,11 +101,15 @@ if uploaded_file:
         frame_path = os.path.join(frames_dir, f"frame_{i:04d}.png")
         frame = cv2.imread(frame_path)
 
-        # Adding simplified text (with larger font and visible positions)
+        # Create a black bar at the top of the frame
+        bar_height = 100  # Height of the black bar (you can adjust this)
+        frame[:bar_height, :] = (0, 0, 0)  # Set the top part of the frame to black
+
+        # Adding text inside the black bar (larger font, visible)
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 1.5  # Larger font size
+        font_scale = 2  # Larger font size
         font_thickness = 4  # Thicker font
-        color = (255, 0, 0)  # Red color for visibility
+        color = (255, 255, 255)  # White text on black background
         line_type = cv2.LINE_AA
 
         # Add text for total jumps, big jumps, small jumps
