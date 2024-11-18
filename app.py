@@ -13,13 +13,16 @@ pose = mp_pose.Pose()
 
 # App Title
 st.title("Jump Analysis with Visual Overlays and Jump Classification")
-st.write("Upload a video to see jump analysis.")
+st.write("Upload a video to see pose keypoints, connections, and jump analysis.")
 
 # Video Upload Section
 uploaded_file = st.file_uploader("Upload a Video", type=["mp4", "mov"])
 
-# Jump counter
+# Jump counter variables
 jump_count = 0
+big_jump_count = 0
+small_jump_count = 0
+total_jumps = 0
 
 if uploaded_file:
     # Save uploaded video to a temporary file
@@ -93,16 +96,19 @@ if uploaded_file:
     st.write(f"Big Jumps: {big_jump_count}")
     st.write(f"Small Jumps: {small_jump_count}")
 
-    # Process the video and display it
+    # Display the processed video with pose markers
     st.write("### Processed Video with Visual Overlays")
     st.video(video_path)
 
-    # Update the jump counter while the video is played
-    if st.button("Start Jump Counter"):
-        # Here we will update the counter
-        for peak in peaks:
-            jump_count += 1
-            st.write(f"Jumps Detected: {jump_count}")
+    # Start counting jumps live when the video is played
+    st.write("### Jump Counter")
+
+    for peak in peaks:
+        # Increment the jump counter for each detected jump
+        jump_count += 1
+        st.write(f"Jumps Detected: {jump_count}")
+        st.write(f"Big Jumps: {big_jump_count}")
+        st.write(f"Small Jumps: {small_jump_count}")
 
     # Clean up the uploaded temporary file and frames
     os.remove(video_path)
