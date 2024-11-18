@@ -39,11 +39,7 @@ if uploaded_file:
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
 
-    out_path = "output_with_overlays_and_counts.mp4"
-    out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_width, frame_height))
-
-    # Y-coordinate data
-    hip_y_positions = []
+    frames_dir = tempfile.mkdtemp()
     frame_count = 0
 
     # Process video frame by frame
@@ -64,39 +60,35 @@ if uploaded_file:
                 frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS
             )
 
-            # Track Y-coordinate of right hip
-            right_hip = results.pose_landmarks.landmark[mp_pose.PoseLandmark.RIGHT_HIP]
-            hip_y_positions.append(right_hip.y)
-
-        # Write the frame to the output video
-        out.write(frame)
+        # Save processed frame to a temporary directory
+        frame_path = os.path.join(frames_dir, f"frame_{frame_count:04d}.png")
+        cv2.imwrite(frame_path, frame)
         frame_count += 1
 
     cap.release()
-    out.release()
 
-    # Classify and count jumps
-    hip_y_positions = np.array(hip_y_positions)
-    peaks, properties = find_peaks(-hip_y_positions, prominence=small_jump_threshold)
+    # Use FFmpeg to compile frames into a video
+    output_video_path = "output_with_overlays_and_counts.mp4"
+    ffmpeg_command = [
+        "ffmpeg",
+        "-y",  # Overwrite output file without asking
+        "-framerate", "30",  # Set the frame rate
+        "-i", os.path.join(frames_dir, "frame_%04d.png"),  # Input frame pattern
+        "-c:v", "libx264",  # Use H.264 codec for compatibility
+        "-pix_fmt", "yuv420p",  # Ensure compatibility with most players
+        output_video_path,
+    ]
+    subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    # Calculate displacements
-    displacements = properties['prominences']
-    big_jumps = [i for i, d in enumerate(displacements) if d >= big_jump_threshold]
-    small_jumps = [i for i, d in enumerate(displacements) if d < big_jump_threshold]
-
-    big_jump_count = len(big_jumps)
-    small_jump_count = len(small_jumps)
-
-    # Display jump counts
-    st.write(f"### Jump Counts")
-    st.write(f"Big Jumps: {big_jump_count}")
-    st.write(f"Pogos (Small Jumps): {small_jump_count}")
-
-    # Display the processed video
+    # Display the output video
     st.write("### Processed Video with Visual Overlays and Jump Classification")
-    st.video(out_path)
+    st.video(output_video_path)
 
-    # Clean up the uploaded temporary file
+    # Clean up temporary files
     os.remove(video_path)
+    for frame_file in os.listdir(frames_dir):
+        os.remove(os.path.join(frames_dir, frame_file))
+    os.rmdir(frames_dir)
+
 else:
     st.warning("Please upload a video.")
