@@ -70,33 +70,55 @@ if uploaded_file:
 
     cap.release()
 
+    # Convert hip_y_positions to numpy array
+    hip_y_positions = np.array(hip_y_positions)
+    
+    # Perform initial jump detection
+    peaks, properties = find_peaks(-hip_y_positions, prominence=0.01)
+    
+    # Add slider for threshold adjustment
+    st.write("### Adjust Big Jump Threshold")
+    st.write("Move the slider to adjust what counts as a 'big jump' vs a 'pogo'")
+    big_jump_threshold = st.slider(
+        "Big Jump Threshold",
+        min_value=0.01,
+        max_value=0.20,
+        value=0.07,  # default value
+        step=0.01,
+        help="Jumps with prominence above this threshold are classified as 'big jumps'"
+    )
+
     # Create and display the jump detection graph
     st.write("### Jump Detection Graph")
     fig, ax = plt.subplots(figsize=(10, 5))
     
-    # Convert hip_y_positions to numpy array
-    hip_y_positions = np.array(hip_y_positions)
-    
-    # Perform jump detection
-    peaks, properties = find_peaks(-hip_y_positions, prominence=0.01)
+    # Separate big and small jumps based on slider value
+    displacements = properties['prominences']
+    big_jump_indices = peaks[displacements >= big_jump_threshold]
+    small_jump_indices = peaks[displacements < big_jump_threshold]
     
     # Plot the hip positions and detected jumps
-    ax.plot(hip_y_positions, label='Hip Y-Position', color='blue', alpha=0.7)
-    ax.plot(peaks, hip_y_positions[peaks], "rx", label="Detected Jumps", markersize=10)
+    ax.plot(-hip_y_positions, label='Hip Y-Position', color='blue', alpha=0.7)
+    
+    # Plot big jumps with red X markers
+    if len(big_jump_indices) > 0:
+        ax.plot(big_jump_indices, -hip_y_positions[big_jump_indices], "rx", 
+                label="Big Jumps", markersize=10, markeredgewidth=2)
+    
+    # Plot small jumps with yellow circle markers
+    if len(small_jump_indices) > 0:
+        ax.plot(small_jump_indices, -hip_y_positions[small_jump_indices], "yo", 
+                label="Small Jumps (Pogos)", markersize=8, markeredgewidth=2)
     
     # Customize the graph
-    ax.set_title('Hip Y-Position with Detected Jumps')
+    ax.set_title('Hip Y-Position with Detected Jumps\n(Higher points represent jumps)')
     ax.set_xlabel('Frame Index')
-    ax.set_ylabel('Y-Coordinate')
+    ax.set_ylabel('Hip Height (inverted Y-Coordinate)')
     ax.legend()
     ax.grid(True, alpha=0.3)
     
     # Display the graph in Streamlit
     st.pyplot(fig)
-    
-    # Classify jumps based on prominence
-    displacements = properties['prominences']
-    big_jump_threshold = 0.07
 
     # Create frame-by-frame counters
     jumps_by_frame = {frame: {'big': 0, 'small': 0, 'total': 0} for frame in range(frame_count)}
