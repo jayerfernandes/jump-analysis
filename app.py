@@ -3,6 +3,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import tempfile
+import os
 
 # Initialize MediaPipe Pose
 mp_pose = mp.solutions.pose
@@ -32,9 +33,12 @@ if uploaded_file:
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
 
+    # Create a temporary output path
     out_path = "output_with_overlays.mp4"
+
+    # Use FFmpeg-compatible codec
     out = cv2.VideoWriter(
-        out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_width, frame_height)
+        out_path, cv2.VideoWriter_fourcc(*"avc1"), fps, (frame_width, frame_height)
     )
 
     # Process video frame by frame
@@ -51,18 +55,4 @@ if uploaded_file:
 
         # Draw pose landmarks and connections
         if results.pose_landmarks:
-            mp_drawing.draw_landmarks(
-                frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS
-            )
-
-        # Write the frame to the output video
-        out.write(frame)
-
-    cap.release()
-    out.release()
-
-    # Display the output video
-    st.write("### Processed Video with Visual Overlays")
-    st.video(out_path)
-else:
-    st.warning("Please upload a video.")
+            mp_drawing.draw_l
