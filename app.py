@@ -103,7 +103,7 @@ if uploaded_file:
 
         # Adding simplified text (with larger font and visible positions)
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 2  # Larger font size
+        font_scale = 1.5  # Larger font size
         font_thickness = 4  # Thicker font
         color = (255, 0, 0)  # Red color for visibility
         line_type = cv2.LINE_AA
@@ -112,9 +112,6 @@ if uploaded_file:
         cv2.putText(frame, f'Total Jumps: {total_jumps}', (50, 50), font, font_scale, color, font_thickness, lineType=line_type)
         cv2.putText(frame, f'Big Jumps: {big_jump_count}', (50, 100), font, font_scale, color, font_thickness, lineType=line_type)
         cv2.putText(frame, f'Pogos: {small_jump_count}', (50, 150), font, font_scale, color, font_thickness, lineType=line_type)
-
-        # Debug: Confirm that text is being added
-        print(f"Text added to frame {i}: Total Jumps = {total_jumps}, Big Jumps = {big_jump_count}, Pogos = {small_jump_count}")
 
         # Write the processed frame with overlays to the output video
         out.write(frame)
