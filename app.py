@@ -6,6 +6,7 @@ import os
 import numpy as np
 from scipy.signal import find_peaks
 import subprocess
+import matplotlib.pyplot as plt
 
 # Initialize MediaPipe Pose
 mp_pose = mp.solutions.pose
@@ -69,9 +70,29 @@ if uploaded_file:
 
     cap.release()
 
-    # Perform jump detection
+    # Create and display the jump detection graph
+    st.write("### Jump Detection Graph")
+    fig, ax = plt.subplots(figsize=(10, 5))
+    
+    # Convert hip_y_positions to numpy array
     hip_y_positions = np.array(hip_y_positions)
+    
+    # Perform jump detection
     peaks, properties = find_peaks(-hip_y_positions, prominence=0.01)
+    
+    # Plot the hip positions and detected jumps
+    ax.plot(hip_y_positions, label='Hip Y-Position', color='blue', alpha=0.7)
+    ax.plot(peaks, hip_y_positions[peaks], "rx", label="Detected Jumps", markersize=10)
+    
+    # Customize the graph
+    ax.set_title('Hip Y-Position with Detected Jumps')
+    ax.set_xlabel('Frame Index')
+    ax.set_ylabel('Y-Coordinate')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    # Display the graph in Streamlit
+    st.pyplot(fig)
     
     # Classify jumps based on prominence
     displacements = properties['prominences']
