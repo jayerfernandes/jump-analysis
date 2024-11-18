@@ -105,7 +105,7 @@ if uploaded_file:
         bar_height = 100  # Height of the black bar (you can adjust this)
         frame[:bar_height, :] = (0, 0, 0)  # Set the top part of the frame to black
 
-        # Adding text inside the black bar (larger font, visible)
+        # Adding text inside the black bar (larger font and visible)
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 2  # Larger font size
         font_thickness = 4  # Thicker font
