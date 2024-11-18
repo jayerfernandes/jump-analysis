@@ -101,17 +101,20 @@ if uploaded_file:
         frame_path = os.path.join(frames_dir, f"frame_{i:04d}.png")
         frame = cv2.imread(frame_path)
 
-        # Overlay jump counts onto the frame (adjusting the font size and positioning)
+        # Adding simplified text (with larger font and visible positions)
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 1.5  # Increased font size
-        font_thickness = 3  # Increased font thickness
-        color = (0, 255, 0)  # Green color
+        font_scale = 2  # Larger font size
+        font_thickness = 4  # Thicker font
+        color = (255, 0, 0)  # Red color for visibility
         line_type = cv2.LINE_AA
 
-        # Adding text for jump counts with adjusted positions
-        cv2.putText(frame, f'Big Jumps: {big_jump_count}', (50, 50), font, font_scale, color, font_thickness, lineType=line_type)
-        cv2.putText(frame, f'Pogos: {small_jump_count}', (50, 100), font, font_scale, color, font_thickness, lineType=line_type)
-        cv2.putText(frame, f'Total Jumps: {total_jumps}', (50, 150), font, font_scale, color, font_thickness, lineType=line_type)
+        # Add text for total jumps, big jumps, small jumps
+        cv2.putText(frame, f'Total Jumps: {total_jumps}', (50, 50), font, font_scale, color, font_thickness, lineType=line_type)
+        cv2.putText(frame, f'Big Jumps: {big_jump_count}', (50, 100), font, font_scale, color, font_thickness, lineType=line_type)
+        cv2.putText(frame, f'Pogos: {small_jump_count}', (50, 150), font, font_scale, color, font_thickness, lineType=line_type)
+
+        # Debug: Confirm that text is being added
+        print(f"Text added to frame {i}: Total Jumps = {total_jumps}, Big Jumps = {big_jump_count}, Pogos = {small_jump_count}")
 
         # Write the processed frame with overlays to the output video
         out.write(frame)
