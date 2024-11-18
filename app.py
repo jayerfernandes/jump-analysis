@@ -54,7 +54,7 @@ if uploaded_file:
     frames_dir = tempfile.mkdtemp()
 
     # Variables for jump classification and counting
-    hip_y_positions = []
+    hip_y_positions_list = []  # Keep this as a list
     frame_count = 0
     big_jumps = []
     small_jumps = []
@@ -77,16 +77,18 @@ if uploaded_file:
 
             # Track Y-coordinate of the left hip (or right hip)
             left_hip = results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_HIP]
-            hip_y_positions.append(left_hip.y)  # Y-coordinate of the left hip
+            hip_y_positions_list.append(left_hip.y)  # Append Y-coordinate to the list
 
         # Save the frame to the temporary directory
         frame_path = os.path.join(frames_dir, f"frame_{frame_count:04d}.png")
         cv2.imwrite(frame_path, frame)
         frame_count += 1
 
+        # Convert the list to a NumPy array for analysis
+        hip_y_positions = np.array(hip_y_positions_list)
+
         # Perform peak detection on hip Y-positions to detect jumps
         if len(hip_y_positions) > 0:
-            hip_y_positions = np.array(hip_y_positions)
             peaks, properties = find_peaks(-hip_y_positions, prominence=0.01)  # Find peaks (representing jumps)
 
             # Classify jumps based on prominence
