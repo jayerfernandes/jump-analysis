@@ -78,17 +78,18 @@ if uploaded_file:
     big_jump_threshold = 0.07
 
     # Create frame-by-frame counters
-    current_big_jumps = 0
-    current_small_jumps = 0
-    jumps_by_frame = {frame: {'big': 0, 'small': 0} for frame in range(frame_count)}
+    jumps_by_frame = {frame: {'big': 0, 'small': 0, 'total': 0} for frame in range(frame_count)}
 
     # Determine which frames contain jumps and their types
+    current_big_jumps = 0
+    current_small_jumps = 0
+    
     for peak_idx, prominence in zip(peaks, displacements):
         if prominence >= big_jump_threshold:
             current_big_jumps += 1
         else:
             current_small_jumps += 1
-            
+        
         # Update all frames after this jump with the new counts
         for frame in range(peak_idx, frame_count):
             jumps_by_frame[frame] = {
@@ -97,6 +98,12 @@ if uploaded_file:
                 'total': current_big_jumps + current_small_jumps
             }
 
+    # Display final counts in Streamlit
+    st.write(f"Final Jump Counts:")
+    st.write(f"Total Jumps: {current_big_jumps + current_small_jumps}")
+    st.write(f"Big Jumps: {current_big_jumps}")
+    st.write(f"Small Jumps: {current_small_jumps}")
+
     # Process saved frames again to add text overlays with running counts
     for i in range(frame_count):
         frame_path = os.path.join(frames_dir, f"frame_{i:04d}.png")
@@ -104,7 +111,7 @@ if uploaded_file:
         
         if frame is not None:
             # Get current counts for this frame
-            current_counts = jumps_by_frame.get(i, {'big': 0, 'small': 0, 'total': 0})
+            current_counts = jumps_by_frame[i]
             
             # Add text overlays with adjusted positioning and style
             font = cv2.FONT_HERSHEY_SIMPLEX
@@ -112,7 +119,6 @@ if uploaded_file:
             thickness = 3
             color = (0, 255, 0)  # Green
             
-            # Add black background for better text visibility
             def put_text_with_background(img, text, position):
                 (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
                 cv2.rectangle(img, 
@@ -129,12 +135,6 @@ if uploaded_file:
 
             # Save the frame with overlays
             cv2.imwrite(frame_path, frame)
-
-    # Display final counts in Streamlit
-    st.write(f"Final Jump Counts:")
-    st.write(f"Total Jumps: {current_big_jumps + current_small_jumps}")
-    st.write(f"Big Jumps: {current_big_jumps}")
-    st.write(f"Small Jumps: {current_small_jumps}")
 
     # Use FFmpeg to compile frames into video
     output_video_path = "output_with_overlays.mp4"
