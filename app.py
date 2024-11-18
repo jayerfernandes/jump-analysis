@@ -103,14 +103,15 @@ if uploaded_file:
 
         # Overlay jump counts onto the frame (adjusting the font size and positioning)
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 1
-        font_thickness = 2
+        font_scale = 1.5  # Increased font size
+        font_thickness = 3  # Increased font thickness
         color = (0, 255, 0)  # Green color
+        line_type = cv2.LINE_AA
 
-        # Text for jump counts
-        cv2.putText(frame, f'Big Jumps: {big_jump_count}', (50, 50), font, font_scale, color, font_thickness, lineType=cv2.LINE_AA)
-        cv2.putText(frame, f'Pogos: {small_jump_count}', (50, 100), font, font_scale, color, font_thickness, lineType=cv2.LINE_AA)
-        cv2.putText(frame, f'Total Jumps: {total_jumps}', (50, 150), font, font_scale, color, font_thickness, lineType=cv2.LINE_AA)
+        # Adding text for jump counts with adjusted positions
+        cv2.putText(frame, f'Big Jumps: {big_jump_count}', (50, 50), font, font_scale, color, font_thickness, lineType=line_type)
+        cv2.putText(frame, f'Pogos: {small_jump_count}', (50, 100), font, font_scale, color, font_thickness, lineType=line_type)
+        cv2.putText(frame, f'Total Jumps: {total_jumps}', (50, 150), font, font_scale, color, font_thickness, lineType=line_type)
 
         # Write the processed frame with overlays to the output video
         out.write(frame)
