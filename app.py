@@ -91,12 +91,25 @@ if uploaded_file:
     st.write(f"Big Jumps: {big_jump_count}")
     st.write(f"Pogos (Small Jumps): {small_jump_count}")
 
-    # Reopen the video to add jump classification overlays
-    cap = cv2.VideoCapture(video_path)
-    out_path = "output_with_overlays_and_counts.mp4"
+    # Use FFmpeg to compile frames into a video with annotations
+    output_video_path = "output_with_overlays_and_counts.mp4"
+    ffmpeg_command = [
+        "ffmpeg",
+        "-y",  # Overwrite output file without asking
+        "-framerate", "30",  # Set the frame rate
+        "-i", os.path.join(frames_dir, "frame_%04d.png"),  # Input frame pattern
+        "-c:v", "libx264",  # Use H.264 codec for compatibility
+        "-pix_fmt", "yuv420p",  # Ensure compatibility with most players
+        output_video_path,
+    ]
+    subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    # Add jump classifications (Big Jump and Pogo) to the video
+    cap = cv2.VideoCapture(output_video_path)
+    out_path = "output_with_final_overlays.mp4"
     out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_width, frame_height))
 
-    # Process the video with jump classification and overlays
+    frame_count = 0
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -104,15 +117,6 @@ if uploaded_file:
 
         # Convert frame to RGB for overlay processing
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        # Process the frame with MediaPipe Pose
-        results = pose.process(frame_rgb)
-
-        # Draw pose landmarks and connections
-        if results.pose_landmarks:
-            mp_drawing.draw_landmarks(
-                frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS
-            )
 
         # Display jump classifications on the video
         for i, peak in enumerate(peaks):
