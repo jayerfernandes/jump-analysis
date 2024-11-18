@@ -1,3 +1,4 @@
+
 import streamlit as st
 import cv2
 import mediapipe as mp
@@ -5,6 +6,7 @@ import tempfile
 import os
 import numpy as np
 from scipy.signal import find_peaks
+import subprocess
 
 # Initialize MediaPipe Pose
 mp_pose = mp.solutions.pose
@@ -17,22 +19,6 @@ st.write("Upload a video to see pose keypoints, connections, and jump analysis."
 
 # Video Upload Section
 uploaded_file = st.file_uploader("Upload a Video", type=["mp4", "mov"])
-
-# Initialize variables
-jump_count = 0
-big_jump_count = 0
-small_jump_count = 0
-total_jumps = 0
-
-# Create a table for jump counts
-jump_table = st.empty()
-
-# Display a table with initial values
-jump_table.write({
-    "Small Jumps": small_jump_count,
-    "Big Jumps": big_jump_count,
-    "Total Jumps": total_jumps
-})
 
 if uploaded_file:
     # Save uploaded video to a temporary file
@@ -54,7 +40,7 @@ if uploaded_file:
     frames_dir = tempfile.mkdtemp()
 
     # Variables for jump classification and counting
-    hip_y_positions_list = []  # Keep this as a list
+    hip_y_positions = []
     frame_count = 0
     big_jumps = []
     small_jumps = []
@@ -65,55 +51,89 @@ if uploaded_file:
         if not ret:
             break
 
-        # Convert frame to RGB (MediaPipe requires RGB input)
+        # Convert frame to RGB
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         # Process the frame with MediaPipe Pose
         results = pose.process(frame_rgb)
 
-        # Draw pose landmarks and connections on the frame
+        # Draw pose landmarks and connections
         if results.pose_landmarks:
             mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
             # Track Y-coordinate of the left hip (or right hip)
             left_hip = results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_HIP]
-            hip_y_positions_list.append(left_hip.y)  # Append Y-coordinate to the list
+            hip_y_positions.append(left_hip.y)  # Y-coordinate of the left hip
 
         # Save the frame to the temporary directory
         frame_path = os.path.join(frames_dir, f"frame_{frame_count:04d}.png")
         cv2.imwrite(frame_path, frame)
         frame_count += 1
 
-        # Convert the list to a NumPy array for analysis
-        hip_y_positions = np.array(hip_y_positions_list)
-
-        # Perform peak detection on hip Y-positions to detect jumps
-        if len(hip_y_positions) > 0:
-            peaks, properties = find_peaks(-hip_y_positions, prominence=0.01)  # Find peaks (representing jumps)
-
-            # Classify jumps based on prominence
-            displacements = properties['prominences']
-            big_jump_threshold = 0.07  # Threshold for big jumps
-            big_jumps = [i for i, d in enumerate(displacements) if d >= big_jump_threshold]
-            small_jumps = [i for i, d in enumerate(displacements) if d < big_jump_threshold]
-
-            # Update the counts for jumps
-            total_jumps = len(peaks)
-            big_jump_count = len(big_jumps)
-            small_jump_count = len(small_jumps)
-
-            # Show jump counts on the Streamlit UI (real-time)
-            jump_table.write({
-                "Small Jumps": small_jump_count,
-                "Big Jumps": big_jump_count,
-                "Total Jumps": total_jumps
-            })
-
     cap.release()
 
-    # Display the processed video with pose markers
-    st.write("### Processed Video with Visual Overlays")
-    st.video(video_path)
+    # Perform peak detection on hip Y-positions to detect jumps
+    hip_y_positions = np.array(hip_y_positions)
+    peaks, properties = find_peaks(-hip_y_positions, prominence=0.01)  # Find peaks (representing jumps)
+    
+    # Classify jumps based on prominence
+    displacements = properties['prominences']
+    big_jump_threshold = 0.07  # Threshold for big jumps
+    big_jumps = [i for i, d in enumerate(displacements) if d >= big_jump_threshold]
+    small_jumps = [i for i, d in enumerate(displacements) if d < big_jump_threshold]
+
+    # Display the results
+    total_jumps = len(peaks)
+    big_jump_count = len(big_jumps)
+    small_jump_count = len(small_jumps)
+
+    # Show jump counts on the Streamlit UI
+    st.write(f"Total Jumps: {total_jumps}")
+    st.write(f"Big Jumps: {big_jump_count}")
+    st.write(f"Small Jumps: {small_jump_count}")
+
+    # Use FFmpeg to compile frames into a video with annotations
+    output_video_path = "output_with_overlays.mp4"  # Using .mp4 format
+    out = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_width, frame_height))
+
+    # Process the video frames again to add jump counter text to each frame
+    frame_count = 0
+    for i in range(frame_count):
+        frame_path = os.path.join(frames_dir, f"frame_{i:04d}.png")
+        frame = cv2.imread(frame_path)
+
+        # Overlay jump counts onto the frame (adjusting the font size and positioning)
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1.5  # Increased font size
+        font_thickness = 3  # Increased font thickness
+        color = (0, 255, 0)  # Green color
+        line_type = cv2.LINE_AA
+
+        # Adding text for jump counts with adjusted positions
+        cv2.putText(frame, f'Big Jumps: {big_jump_count}', (50, 50), font, font_scale, color, font_thickness, lineType=line_type)
+        cv2.putText(frame, f'Pogos: {small_jump_count}', (50, 100), font, font_scale, color, font_thickness, lineType=line_type)
+        cv2.putText(frame, f'Total Jumps: {total_jumps}', (50, 150), font, font_scale, color, font_thickness, lineType=line_type)
+
+        # Write the processed frame with overlays to the output video
+        out.write(frame)
+
+    out.release()
+
+    # Run FFmpeg to create the video
+    ffmpeg_command = [
+        "ffmpeg",
+        "-y",  # Overwrite output file without asking
+        "-framerate", "30",  # Set the frame rate
+        "-i", os.path.join(frames_dir, "frame_%04d.png"),  # Input frame pattern
+        "-c:v", "libx264",  # Use H.264 codec for compatibility
+        "-pix_fmt", "yuv420p",  # Ensure compatibility with most players
+        output_video_path,
+    ]
+    subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    # Display the processed video with overlays
+    st.write("### Processed Video with Visual Overlays and Jump Classification")
+    st.video(output_video_path)
 
     # Clean up the uploaded temporary file and frames
     os.remove(video_path)
