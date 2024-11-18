@@ -41,10 +41,8 @@ if uploaded_file:
     # Variables for jump classification and counting
     hip_y_positions = []
     frame_count = 0
-    big_jumps = []
-    small_jumps = []
 
-    # Process video frame by frame
+    # Process video frame by frame and collect hip positions
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -75,30 +73,39 @@ if uploaded_file:
     hip_y_positions = np.array(hip_y_positions)
     peaks, properties = find_peaks(-hip_y_positions, prominence=0.01)
     
-    # Classify jumps
+    # Classify jumps based on prominence
     displacements = properties['prominences']
     big_jump_threshold = 0.07
-    big_jumps = [i for i, d in enumerate(displacements) if d >= big_jump_threshold]
-    small_jumps = [i for i, d in enumerate(displacements) if d < big_jump_threshold]
 
-    total_jumps = len(peaks)
-    big_jump_count = len(big_jumps)
-    small_jump_count = len(small_jumps)
+    # Create frame-by-frame counters
+    current_big_jumps = 0
+    current_small_jumps = 0
+    jumps_by_frame = {frame: {'big': 0, 'small': 0} for frame in range(frame_count)}
 
-    # Display stats in Streamlit
-    st.write(f"Total Jumps: {total_jumps}")
-    st.write(f"Big Jumps: {big_jump_count}")
-    st.write(f"Small Jumps: {small_jump_count}")
+    # Determine which frames contain jumps and their types
+    for peak_idx, prominence in zip(peaks, displacements):
+        if prominence >= big_jump_threshold:
+            current_big_jumps += 1
+        else:
+            current_small_jumps += 1
+            
+        # Update all frames after this jump with the new counts
+        for frame in range(peak_idx, frame_count):
+            jumps_by_frame[frame] = {
+                'big': current_big_jumps,
+                'small': current_small_jumps,
+                'total': current_big_jumps + current_small_jumps
+            }
 
-    # Create output video with text overlays using FFmpeg
-    output_video_path = "output_with_overlays.mp4"
-
-    # Process saved frames again to add text overlays
-    for i in range(frame_count):  # Use the actual frame_count from earlier
+    # Process saved frames again to add text overlays with running counts
+    for i in range(frame_count):
         frame_path = os.path.join(frames_dir, f"frame_{i:04d}.png")
         frame = cv2.imread(frame_path)
         
-        if frame is not None:  # Check if frame was read successfully
+        if frame is not None:
+            # Get current counts for this frame
+            current_counts = jumps_by_frame.get(i, {'big': 0, 'small': 0, 'total': 0})
+            
             # Add text overlays with adjusted positioning and style
             font = cv2.FONT_HERSHEY_SIMPLEX
             font_scale = 1.5
@@ -108,24 +115,29 @@ if uploaded_file:
             # Add black background for better text visibility
             def put_text_with_background(img, text, position):
                 (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
-                # Draw black background rectangle
                 cv2.rectangle(img, 
                             (position[0] - 10, position[1] - text_height - 10),
                             (position[0] + text_width + 10, position[1] + 10),
                             (0, 0, 0),
                             -1)
-                # Draw text
                 cv2.putText(img, text, position, font, font_scale, color, thickness, cv2.LINE_AA)
 
-            # Add text with backgrounds
-            put_text_with_background(frame, f'Big Jumps: {big_jump_count}', (50, 50))
-            put_text_with_background(frame, f'Pogos: {small_jump_count}', (50, 100))
-            put_text_with_background(frame, f'Total Jumps: {total_jumps}', (50, 150))
+            # Add text with backgrounds showing running counts
+            put_text_with_background(frame, f'Big Jumps: {current_counts["big"]}', (50, 50))
+            put_text_with_background(frame, f'Pogos: {current_counts["small"]}', (50, 100))
+            put_text_with_background(frame, f'Total Jumps: {current_counts["total"]}', (50, 150))
 
             # Save the frame with overlays
             cv2.imwrite(frame_path, frame)
 
+    # Display final counts in Streamlit
+    st.write(f"Final Jump Counts:")
+    st.write(f"Total Jumps: {current_big_jumps + current_small_jumps}")
+    st.write(f"Big Jumps: {current_big_jumps}")
+    st.write(f"Small Jumps: {current_small_jumps}")
+
     # Use FFmpeg to compile frames into video
+    output_video_path = "output_with_overlays.mp4"
     ffmpeg_command = [
         "ffmpeg",
         "-y",
@@ -133,7 +145,7 @@ if uploaded_file:
         "-i", os.path.join(frames_dir, "frame_%04d.png"),
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
-        "-preset", "fast",  # Added for faster encoding
+        "-preset", "fast",
         output_video_path
     ]
     subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
