@@ -73,26 +73,15 @@ if uploaded_file:
     # Convert hip_y_positions to numpy array
     hip_y_positions = np.array(hip_y_positions)
     
-    # Perform initial jump detection
+    # Perform jump detection
     peaks, properties = find_peaks(-hip_y_positions, prominence=0.01)
     
-    # Add slider for threshold adjustment
-    st.write("### Adjust Big Jump Threshold")
-    st.write("Move the slider to adjust what counts as a 'big jump' vs a 'pogo'")
-    big_jump_threshold = st.slider(
-        "Big Jump Threshold",
-        min_value=0.01,
-        max_value=0.20,
-        value=0.07,  # default value
-        step=0.01,
-        help="Jumps with prominence above this threshold are classified as 'big jumps'"
-    )
-
     # Create and display the jump detection graph
     st.write("### Jump Detection Graph")
     fig, ax = plt.subplots(figsize=(10, 5))
     
-    # Separate big and small jumps based on slider value
+    # Set threshold and separate big and small jumps
+    big_jump_threshold = 0.08
     displacements = properties['prominences']
     big_jump_indices = peaks[displacements >= big_jump_threshold]
     small_jump_indices = peaks[displacements < big_jump_threshold]
