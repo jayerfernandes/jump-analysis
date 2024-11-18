@@ -50,13 +50,13 @@ if uploaded_file:
         if not ret:
             break
 
-        # Convert frame to RGB
+        # Convert frame to RGB (MediaPipe requires RGB input)
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         # Process the frame with MediaPipe Pose
         results = pose.process(frame_rgb)
 
-        # Draw pose landmarks and connections
+        # Draw pose landmarks and connections on the frame
         if results.pose_landmarks:
             mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
@@ -74,7 +74,7 @@ if uploaded_file:
     # Perform peak detection on hip Y-positions to detect jumps
     hip_y_positions = np.array(hip_y_positions)
     peaks, properties = find_peaks(-hip_y_positions, prominence=0.01)  # Find peaks (representing jumps)
-    
+
     # Classify jumps based on prominence
     displacements = properties['prominences']
     big_jump_threshold = 0.07  # Threshold for big jumps
@@ -91,8 +91,8 @@ if uploaded_file:
     st.write(f"Big Jumps: {big_jump_count}")
     st.write(f"Small Jumps: {small_jump_count}")
 
-    # Use FFmpeg to compile frames into a video with annotations
-    output_video_path = "output_with_overlays.mp4"  # Using .mp4 format
+    # Initialize video writer to create output video
+    output_video_path = "output_with_overlays.mp4"
     out = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_width, frame_height))
 
     # Process the video frames again to add jump counter text to each frame
@@ -101,15 +101,15 @@ if uploaded_file:
         frame_path = os.path.join(frames_dir, f"frame_{i:04d}.png")
         frame = cv2.imread(frame_path)
 
-        # Create a black bar at the top of the frame
-        bar_height = 100  # Height of the black bar (you can adjust this)
+        # Add black bar at the top for text overlay
+        bar_height = 100  # Height of the black bar (adjustable)
         frame[:bar_height, :] = (0, 0, 0)  # Set the top part of the frame to black
 
-        # Adding text inside the black bar (larger font and visible)
+        # Adding text inside the black bar
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 2  # Larger font size
-        font_thickness = 4  # Thicker font
-        color = (255, 255, 255)  # White text on black background
+        font_scale = 2
+        font_thickness = 4
+        color = (255, 255, 255)  # White text
         line_type = cv2.LINE_AA
 
         # Add text for total jumps, big jumps, small jumps
@@ -122,7 +122,7 @@ if uploaded_file:
 
     out.release()
 
-    # Run FFmpeg to create the video
+    # Run FFmpeg to create the final video
     ffmpeg_command = [
         "ffmpeg",
         "-y",  # Overwrite output file without asking
@@ -138,7 +138,7 @@ if uploaded_file:
     st.write("### Processed Video with Visual Overlays and Jump Classification")
     st.video(output_video_path)
 
-    # Clean up the uploaded temporary file and frames
+    # Clean up temporary files
     os.remove(video_path)
     for frame_file in os.listdir(frames_dir):
         os.remove(os.path.join(frames_dir, frame_file))
