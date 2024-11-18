@@ -33,10 +33,11 @@ if uploaded_file:
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
 
-    out_path = "output_with_overlays.mp4"
-    out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_width, frame_height))
+    # Create a temporary directory for frames
+    frames_dir = tempfile.mkdtemp()
+    frame_count = 0
 
-    # Process video frame by frame (without jump counting)
+    # Process video frame by frame
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -54,17 +55,35 @@ if uploaded_file:
                 frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS
             )
 
-        # Write the frame to the output video (with overlays)
-        out.write(frame)
+        # Save processed frame to the temporary directory
+        frame_path = os.path.join(frames_dir, f"frame_{frame_count:04d}.png")
+        cv2.imwrite(frame_path, frame)
+        frame_count += 1
 
     cap.release()
-    out.release()
 
-    # Display the output video with overlays
+    # Use FFmpeg to compile frames into a video with annotations
+    output_video_path = "output_with_overlays.avi"  # Using AVI for testing
+    ffmpeg_command = [
+        "ffmpeg",
+        "-y",  # Overwrite output file without asking
+        "-framerate", "30",  # Set the frame rate
+        "-i", os.path.join(frames_dir, "frame_%04d.png"),  # Input frame pattern
+        "-c:v", "libx264",  # Use H.264 codec for compatibility
+        "-pix_fmt", "yuv420p",  # Ensure compatibility with most players
+        output_video_path,
+    ]
+    subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    # Display the processed video with overlays
     st.write("### Processed Video with Visual Overlays")
-    st.video(out_path)
+    st.video(output_video_path)
 
     # Clean up the uploaded temporary file
     os.remove(video_path)
+    for frame_file in os.listdir(frames_dir):
+        os.remove(os.path.join(frames_dir, frame_file))
+    os.rmdir(frames_dir)
+
 else:
     st.warning("Please upload a video.")
