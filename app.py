@@ -86,13 +86,32 @@ if uploaded_file:
     big_jump_count = len(big_jumps)
     small_jump_count = len(small_jumps)
 
-    # Show jump counts
+    # Show jump counts on the Streamlit UI
     st.write(f"Total Jumps: {total_jumps}")
     st.write(f"Big Jumps: {big_jump_count}")
     st.write(f"Small Jumps: {small_jump_count}")
 
     # Use FFmpeg to compile frames into a video with annotations
     output_video_path = "output_with_overlays.mp4"  # Using .mp4 format
+    out = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_width, frame_height))
+
+    # Process the video frames again to add jump counter text to each frame
+    frame_count = 0
+    for i in range(frame_count):
+        frame_path = os.path.join(frames_dir, f"frame_{i:04d}.png")
+        frame = cv2.imread(frame_path)
+
+        # Overlay jump counts onto the frame
+        cv2.putText(frame, f'Big Jumps: {big_jump_count}', (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(frame, f'Pogos: {small_jump_count}', (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(frame, f'Total Jumps: {total_jumps}', (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+        # Write the processed frame with overlays to the output video
+        out.write(frame)
+
+    out.release()
+
+    # Run FFmpeg to create the video
     ffmpeg_command = [
         "ffmpeg",
         "-y",  # Overwrite output file without asking
@@ -102,8 +121,6 @@ if uploaded_file:
         "-pix_fmt", "yuv420p",  # Ensure compatibility with most players
         output_video_path,
     ]
-
-    # Run the FFmpeg command to create the video
     subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     # Display the processed video with overlays
