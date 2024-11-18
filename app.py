@@ -3,7 +3,8 @@ import cv2
 import mediapipe as mp
 import tempfile
 import os
-import subprocess
+import numpy as np
+from scipy.signal import find_peaks
 
 # Initialize MediaPipe Pose
 mp_pose = mp.solutions.pose
@@ -11,8 +12,8 @@ mp_drawing = mp.solutions.drawing_utils
 pose = mp_pose.Pose()
 
 # App Title
-st.title("Jump Analysis with Visual Overlays")
-st.write("Upload a video to see pose keypoints and connections visualized.")
+st.title("Jump Analysis with Visual Overlays and Classification")
+st.write("Upload a video to see pose keypoints, connections, and jump analysis.")
 
 # Video Upload Section
 uploaded_file = st.file_uploader("Upload a Video", type=["mp4", "mov"])
@@ -33,11 +34,20 @@ if uploaded_file:
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
 
+    # Prepare to write output video
+    out_path = "output_with_overlays.mp4"  # Using .mp4 for compatibility
+    out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_width, frame_height))
+
     # Temporary directory for frames
     frames_dir = tempfile.mkdtemp()
 
-    # Process video frame by frame
+    # Variables for jump classification and counting
+    hip_y_positions = []
     frame_count = 0
+    big_jumps = []
+    small_jumps = []
+
+    # Process video frame by frame
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -53,31 +63,40 @@ if uploaded_file:
         if results.pose_landmarks:
             mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
-        # Save the frame to the temporary directory
-        frame_path = os.path.join(frames_dir, f"frame_{frame_count:04d}.png")
-        cv2.imwrite(frame_path, frame)
+            # Track Y-coordinate of the left hip (or right hip)
+            left_hip = results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_HIP]
+            hip_y_positions.append(left_hip.y)  # Y-coordinate of the left hip
+
+        # Write the processed frame with overlays to the output video
+        out.write(frame)
         frame_count += 1
 
     cap.release()
+    out.release()
 
-    # Use FFmpeg to compile frames into a video with annotations
-    output_video_path = "output_with_overlays.mp4"  # Using .mp4 format
-    ffmpeg_command = [
-        "ffmpeg",
-        "-y",  # Overwrite output file without asking
-        "-framerate", "30",  # Set the frame rate
-        "-i", os.path.join(frames_dir, "frame_%04d.png"),  # Input frame pattern
-        "-c:v", "libx264",  # Use H.264 codec for compatibility
-        "-pix_fmt", "yuv420p",  # Ensure compatibility with most players
-        output_video_path,
-    ]
+    # Perform peak detection on hip Y-positions to detect jumps
+    hip_y_positions = np.array(hip_y_positions)
+    peaks, properties = find_peaks(-hip_y_positions, prominence=0.01)  # Find peaks (representing jumps)
+    
+    # Classify jumps based on prominence
+    displacements = properties['prominences']
+    big_jump_threshold = 0.07  # Threshold for big jumps
+    big_jumps = [i for i, d in enumerate(displacements) if d >= big_jump_threshold]
+    small_jumps = [i for i, d in enumerate(displacements) if d < big_jump_threshold]
 
-    # Run the FFmpeg command to create the video
-    subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # Display the results
+    total_jumps = len(peaks)
+    big_jump_count = len(big_jumps)
+    small_jump_count = len(small_jumps)
+
+    # Show jump counts
+    st.write(f"Total Jumps: {total_jumps}")
+    st.write(f"Big Jumps: {big_jump_count}")
+    st.write(f"Small Jumps: {small_jump_count}")
 
     # Display the processed video with overlays
-    st.write("### Processed Video with Visual Overlays")
-    st.video(output_video_path)
+    st.write("### Processed Video with Visual Overlays and Jump Classification")
+    st.video(out_path)
 
     # Clean up the uploaded temporary file and frames
     os.remove(video_path)
