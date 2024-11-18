@@ -1,9 +1,9 @@
 import streamlit as st
 import cv2
 import mediapipe as mp
-import numpy as np
 import tempfile
 import os
+import subprocess
 
 # Initialize MediaPipe Pose
 mp_pose = mp.solutions.pose
@@ -21,25 +21,16 @@ if uploaded_file:
     # Save uploaded video to a temporary file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_file:
         temp_file.write(uploaded_file.read())
-        video_path = temp_file.name
+        input_video_path = temp_file.name
 
     st.success("Video uploaded successfully!")
 
     # Load the video
-    cap = cv2.VideoCapture(video_path)
+    cap = cv2.VideoCapture(input_video_path)
 
-    # Prepare output video
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-
-    # Create a temporary output path
-    out_path = "output_with_overlays.mp4"
-
-    # Use FFmpeg-compatible codec
-    out = cv2.VideoWriter(
-        out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_width, frame_height)
-    )
+    # Prepare a temporary directory for frames
+    frames_dir = tempfile.mkdtemp()
+    frame_count = 0
 
     # Process video frame by frame
     while cap.isOpened():
@@ -55,4 +46,38 @@ if uploaded_file:
 
         # Draw pose landmarks and connections
         if results.pose_landmarks:
-            mp_drawing.draw_landmarks
+            mp_drawing.draw_landmarks(
+                frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS
+            )
+
+        # Save processed frame to the temporary directory
+        frame_path = os.path.join(frames_dir, f"frame_{frame_count:04d}.png")
+        cv2.imwrite(frame_path, frame)
+        frame_count += 1
+
+    cap.release()
+
+    # Use FFmpeg to compile the frames into a video
+    output_video_path = "output_with_overlays.mp4"
+    ffmpeg_command = [
+        "ffmpeg",
+        "-y",
+        "-framerate", "30",  # Set the frame rate
+        "-i", os.path.join(frames_dir, "frame_%04d.png"),  # Input frame pattern
+        "-c:v", "libx264",  # Use H.264 codec
+        "-pix_fmt", "yuv420p",  # Ensure compatibility with most players
+        output_video_path,
+    ]
+    subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    # Display the output video
+    st.write("### Processed Video with Visual Overlays")
+    st.video(output_video_path)
+
+    # Clean up temporary files
+    os.remove(input_video_path)
+    for frame_file in os.listdir(frames_dir):
+        os.remove(os.path.join(frames_dir, frame_file))
+    os.rmdir(frames_dir)
+else:
+    st.warning("Please upload a video.")
