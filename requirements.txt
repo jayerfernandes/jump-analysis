@@ -1,5 +1,7 @@
-streamlit
-opencv-python
-mediapipe
-matplotlib
-scipy
+streamlit==1.40.1
+opencv-python==4.7.0.72
+opencv-python-headless==4.7.0.72  # To prevent issues with GUI components in Streamlit Cloud
+mediapipe==0.10.18
+scipy==1.10.0
+matplotlib==3.7.1
+ffmpeg-python==0.2.0  # For using FFmpeg in Python
