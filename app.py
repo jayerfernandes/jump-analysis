@@ -101,10 +101,16 @@ if uploaded_file:
         frame_path = os.path.join(frames_dir, f"frame_{i:04d}.png")
         frame = cv2.imread(frame_path)
 
-        # Overlay jump counts onto the frame
-        cv2.putText(frame, f'Big Jumps: {big_jump_count}', (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        cv2.putText(frame, f'Pogos: {small_jump_count}', (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        cv2.putText(frame, f'Total Jumps: {total_jumps}', (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        # Overlay jump counts onto the frame (adjusting the font size and positioning)
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1
+        font_thickness = 2
+        color = (0, 255, 0)  # Green color
+
+        # Text for jump counts
+        cv2.putText(frame, f'Big Jumps: {big_jump_count}', (50, 50), font, font_scale, color, font_thickness, lineType=cv2.LINE_AA)
+        cv2.putText(frame, f'Pogos: {small_jump_count}', (50, 100), font, font_scale, color, font_thickness, lineType=cv2.LINE_AA)
+        cv2.putText(frame, f'Total Jumps: {total_jumps}', (50, 150), font, font_scale, color, font_thickness, lineType=cv2.LINE_AA)
 
         # Write the processed frame with overlays to the output video
         out.write(frame)
