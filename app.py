@@ -39,7 +39,11 @@ if uploaded_file:
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
 
-    frames_dir = tempfile.mkdtemp()
+    out_path = "output_with_overlays_and_counts.mp4"
+    out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_width, frame_height))
+
+    # Y-coordinate data
+    hip_y_positions = []
     frame_count = 0
 
     # Process video frame by frame
@@ -60,35 +64,77 @@ if uploaded_file:
                 frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS
             )
 
-        # Save processed frame to a temporary directory
-        frame_path = os.path.join(frames_dir, f"frame_{frame_count:04d}.png")
-        cv2.imwrite(frame_path, frame)
+            # Track Y-coordinate of right hip
+            right_hip = results.pose_landmarks.landmark[mp_pose.PoseLandmark.RIGHT_HIP]
+            hip_y_positions.append(right_hip.y)
+
+        # Write the frame to the output video
+        out.write(frame)
         frame_count += 1
 
     cap.release()
+    out.release()
 
-    # Use FFmpeg to compile frames into a video
-    output_video_path = "output_with_overlays_and_counts.mp4"
-    ffmpeg_command = [
-        "ffmpeg",
-        "-y",  # Overwrite output file without asking
-        "-framerate", "30",  # Set the frame rate
-        "-i", os.path.join(frames_dir, "frame_%04d.png"),  # Input frame pattern
-        "-c:v", "libx264",  # Use H.264 codec for compatibility
-        "-pix_fmt", "yuv420p",  # Ensure compatibility with most players
-        output_video_path,
-    ]
-    subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # Classify and count jumps
+    hip_y_positions = np.array(hip_y_positions)
+    peaks, properties = find_peaks(-hip_y_positions, prominence=small_jump_threshold)
 
-    # Display the output video
+    # Calculate displacements
+    displacements = properties['prominences']
+    big_jumps = [i for i, d in enumerate(displacements) if d >= big_jump_threshold]
+    small_jumps = [i for i, d in enumerate(displacements) if d < big_jump_threshold]
+
+    big_jump_count = len(big_jumps)
+    small_jump_count = len(small_jumps)
+
+    # Display jump counts
+    st.write(f"### Jump Counts")
+    st.write(f"Big Jumps: {big_jump_count}")
+    st.write(f"Pogos (Small Jumps): {small_jump_count}")
+
+    # Reopen the video to add jump classification overlays
+    cap = cv2.VideoCapture(video_path)
+    out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_width, frame_height))
+
+    frame_count = 0
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        # Convert frame to RGB for overlay processing
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        # Process the frame with MediaPipe Pose
+        results = pose.process(frame_rgb)
+
+        # Draw pose landmarks and connections
+        if results.pose_landmarks:
+            mp_drawing.draw_landmarks(
+                frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS
+            )
+
+        # Display jump classifications on the video
+        for i, peak in enumerate(peaks):
+            y_position = hip_y_positions[peak]
+            if i in big_jumps:
+                cv2.putText(frame, "Big Jump", (50, 50 + (i * 30)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            else:
+                cv2.putText(frame, "Pogo", (50, 50 + (i * 30)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+        # Write the frame to the output video with overlays
+        out.write(frame)
+        frame_count += 1
+
+    cap.release()
+    out.release()
+
+    # Display the processed video with overlays and jump classification
     st.write("### Processed Video with Visual Overlays and Jump Classification")
-    st.video(output_video_path)
+    st.video(out_path)
 
-    # Clean up temporary files
+    # Clean up the uploaded temporary file
     os.remove(video_path)
-    for frame_file in os.listdir(frames_dir):
-        os.remove(os.path.join(frames_dir, frame_file))
-    os.rmdir(frames_dir)
 
 else:
     st.warning("Please upload a video.")
