@@ -8,6 +8,7 @@ from scipy.signal import find_peaks
 
 # Initialize MediaPipe Pose
 mp_pose = mp.solutions.pose
+mp_drawing = mp.solutions.drawing_utils
 pose = mp_pose.Pose()
 
 # App Title
