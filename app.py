@@ -39,12 +39,11 @@ if uploaded_file:
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
 
-    out_path = "output_with_overlays_and_counts.mp4"
-    out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_width, frame_height))
-
-    # Y-coordinate data
-    hip_y_positions = []
+    # Create a temporary directory for frames
+    frames_dir = tempfile.mkdtemp()
     frame_count = 0
+
+    hip_y_positions = []
 
     # Process video frame by frame
     while cap.isOpened():
@@ -68,12 +67,12 @@ if uploaded_file:
             right_hip = results.pose_landmarks.landmark[mp_pose.PoseLandmark.RIGHT_HIP]
             hip_y_positions.append(right_hip.y)
 
-        # Write the frame to the output video
-        out.write(frame)
+        # Save processed frame to the temporary directory
+        frame_path = os.path.join(frames_dir, f"frame_{frame_count:04d}.png")
+        cv2.imwrite(frame_path, frame)
         frame_count += 1
 
     cap.release()
-    out.release()
 
     # Classify and count jumps
     hip_y_positions = np.array(hip_y_positions)
@@ -94,9 +93,10 @@ if uploaded_file:
 
     # Reopen the video to add jump classification overlays
     cap = cv2.VideoCapture(video_path)
+    out_path = "output_with_overlays_and_counts.mp4"
     out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_width, frame_height))
 
-    frame_count = 0
+    # Process the video with jump classification and overlays
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -124,7 +124,6 @@ if uploaded_file:
 
         # Write the frame to the output video with overlays
         out.write(frame)
-        frame_count += 1
 
     cap.release()
     out.release()
@@ -135,6 +134,9 @@ if uploaded_file:
 
     # Clean up the uploaded temporary file
     os.remove(video_path)
+    for frame_file in os.listdir(frames_dir):
+        os.remove(os.path.join(frames_dir, frame_file))
+    os.rmdir(frames_dir)
 
 else:
     st.warning("Please upload a video.")
