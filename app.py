@@ -3,6 +3,7 @@ import cv2
 import mediapipe as mp
 import tempfile
 import os
+import subprocess
 
 # Initialize MediaPipe Pose
 mp_pose = mp.solutions.pose
@@ -32,11 +33,11 @@ if uploaded_file:
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
 
-    # Prepare to write output video
-    out_path = "output_with_overlays.mp4"  # Using .mp4 for compatibility
-    out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_width, frame_height))
+    # Temporary directory for frames
+    frames_dir = tempfile.mkdtemp()
 
-    # Process video frame by frame (without jump counting)
+    # Process video frame by frame
+    frame_count = 0
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -52,17 +53,38 @@ if uploaded_file:
         if results.pose_landmarks:
             mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
-        # Write the processed frame with overlays to the output video
-        out.write(frame)
+        # Save the frame to the temporary directory
+        frame_path = os.path.join(frames_dir, f"frame_{frame_count:04d}.png")
+        cv2.imwrite(frame_path, frame)
+        frame_count += 1
 
     cap.release()
-    out.release()
+
+    # Use FFmpeg to compile frames into a video with annotations
+    output_video_path = "output_with_overlays.mp4"  # Using .mp4 format
+    ffmpeg_command = [
+        "ffmpeg",
+        "-y",  # Overwrite output file without asking
+        "-framerate", "30",  # Set the frame rate
+        "-i", os.path.join(frames_dir, "frame_%04d.png"),  # Input frame pattern
+        "-c:v", "libx264",  # Use H.264 codec for compatibility
+        "-pix_fmt", "yuv420p",  # Ensure compatibility with most players
+        output_video_path,
+    ]
+
+    # Run the FFmpeg command to create the video
+    subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     # Display the processed video with overlays
     st.write("### Processed Video with Visual Overlays")
-    st.video(out_path)
+    st.video(output_video_path)
 
-    # Clean up the uploaded temporary file
+    # Clean up the uploaded temporary file and frames
     os.remove(video_path)
+    for frame_file in os.listdir(frames_dir):
+        os.remove(os.path.join(frames_dir, frame_file))
+    os.rmdir(frames_dir)
+
 else:
     st.warning("Please upload a video.")
+
