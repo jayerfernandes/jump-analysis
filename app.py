@@ -1,4 +1,3 @@
-
 import streamlit as st
 import cv2
 import mediapipe as mp
@@ -51,7 +50,7 @@ if uploaded_file:
         if not ret:
             break
 
-        # Convert frame to RGB
+        # Convert frame to RGB for MediaPipe
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         # Process the frame with MediaPipe Pose
@@ -61,81 +60,89 @@ if uploaded_file:
         if results.pose_landmarks:
             mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
-            # Track Y-coordinate of the left hip (or right hip)
+            # Track Y-coordinate of the left hip
             left_hip = results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_HIP]
-            hip_y_positions.append(left_hip.y)  # Y-coordinate of the left hip
+            hip_y_positions.append(left_hip.y)
 
-        # Save the frame to the temporary directory
+        # Save the frame
         frame_path = os.path.join(frames_dir, f"frame_{frame_count:04d}.png")
         cv2.imwrite(frame_path, frame)
         frame_count += 1
 
     cap.release()
 
-    # Perform peak detection on hip Y-positions to detect jumps
+    # Perform jump detection
     hip_y_positions = np.array(hip_y_positions)
-    peaks, properties = find_peaks(-hip_y_positions, prominence=0.01)  # Find peaks (representing jumps)
+    peaks, properties = find_peaks(-hip_y_positions, prominence=0.01)
     
-    # Classify jumps based on prominence
+    # Classify jumps
     displacements = properties['prominences']
-    big_jump_threshold = 0.07  # Threshold for big jumps
+    big_jump_threshold = 0.07
     big_jumps = [i for i, d in enumerate(displacements) if d >= big_jump_threshold]
     small_jumps = [i for i, d in enumerate(displacements) if d < big_jump_threshold]
 
-    # Display the results
     total_jumps = len(peaks)
     big_jump_count = len(big_jumps)
     small_jump_count = len(small_jumps)
 
-    # Show jump counts on the Streamlit UI
+    # Display stats in Streamlit
     st.write(f"Total Jumps: {total_jumps}")
     st.write(f"Big Jumps: {big_jump_count}")
     st.write(f"Small Jumps: {small_jump_count}")
 
-    # Use FFmpeg to compile frames into a video with annotations
-    output_video_path = "output_with_overlays.mp4"  # Using .mp4 format
-    out = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_width, frame_height))
+    # Create output video with text overlays using FFmpeg
+    output_video_path = "output_with_overlays.mp4"
 
-    # Process the video frames again to add jump counter text to each frame
-    frame_count = 0
-    for i in range(frame_count):
+    # Process saved frames again to add text overlays
+    for i in range(frame_count):  # Use the actual frame_count from earlier
         frame_path = os.path.join(frames_dir, f"frame_{i:04d}.png")
         frame = cv2.imread(frame_path)
+        
+        if frame is not None:  # Check if frame was read successfully
+            # Add text overlays with adjusted positioning and style
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 1.5
+            thickness = 3
+            color = (0, 255, 0)  # Green
+            
+            # Add black background for better text visibility
+            def put_text_with_background(img, text, position):
+                (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+                # Draw black background rectangle
+                cv2.rectangle(img, 
+                            (position[0] - 10, position[1] - text_height - 10),
+                            (position[0] + text_width + 10, position[1] + 10),
+                            (0, 0, 0),
+                            -1)
+                # Draw text
+                cv2.putText(img, text, position, font, font_scale, color, thickness, cv2.LINE_AA)
 
-        # Overlay jump counts onto the frame (adjusting the font size and positioning)
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 1.5  # Increased font size
-        font_thickness = 3  # Increased font thickness
-        color = (0, 255, 0)  # Green color
-        line_type = cv2.LINE_AA
+            # Add text with backgrounds
+            put_text_with_background(frame, f'Big Jumps: {big_jump_count}', (50, 50))
+            put_text_with_background(frame, f'Pogos: {small_jump_count}', (50, 100))
+            put_text_with_background(frame, f'Total Jumps: {total_jumps}', (50, 150))
 
-        # Adding text for jump counts with adjusted positions
-        cv2.putText(frame, f'Big Jumps: {big_jump_count}', (50, 50), font, font_scale, color, font_thickness, lineType=line_type)
-        cv2.putText(frame, f'Pogos: {small_jump_count}', (50, 100), font, font_scale, color, font_thickness, lineType=line_type)
-        cv2.putText(frame, f'Total Jumps: {total_jumps}', (50, 150), font, font_scale, color, font_thickness, lineType=line_type)
+            # Save the frame with overlays
+            cv2.imwrite(frame_path, frame)
 
-        # Write the processed frame with overlays to the output video
-        out.write(frame)
-
-    out.release()
-
-    # Run FFmpeg to create the video
+    # Use FFmpeg to compile frames into video
     ffmpeg_command = [
         "ffmpeg",
-        "-y",  # Overwrite output file without asking
-        "-framerate", "30",  # Set the frame rate
-        "-i", os.path.join(frames_dir, "frame_%04d.png"),  # Input frame pattern
-        "-c:v", "libx264",  # Use H.264 codec for compatibility
-        "-pix_fmt", "yuv420p",  # Ensure compatibility with most players
-        output_video_path,
+        "-y",
+        "-framerate", str(fps),
+        "-i", os.path.join(frames_dir, "frame_%04d.png"),
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-preset", "fast",  # Added for faster encoding
+        output_video_path
     ]
     subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    # Display the processed video with overlays
+    # Display the processed video
     st.write("### Processed Video with Visual Overlays and Jump Classification")
     st.video(output_video_path)
 
-    # Clean up the uploaded temporary file and frames
+    # Cleanup
     os.remove(video_path)
     for frame_file in os.listdir(frames_dir):
         os.remove(os.path.join(frames_dir, frame_file))
