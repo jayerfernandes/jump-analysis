@@ -102,7 +102,7 @@ if uploaded_file:
         frame = cv2.imread(frame_path)
 
         # Create a black bar at the top of the frame
-        bar_height = 1000  # Height of the black bar (you can adjust this)
+        bar_height = 100  # Height of the black bar (you can adjust this)
         frame[:bar_height, :] = (0, 0, 0)  # Set the top part of the frame to black
 
         # Adding text inside the black bar (larger font and visible)
