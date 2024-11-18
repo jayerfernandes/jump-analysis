@@ -38,7 +38,7 @@ if uploaded_file:
 
     # Use FFmpeg-compatible codec
     out = cv2.VideoWriter(
-        out_path, cv2.VideoWriter_fourcc(*"avc1"), fps, (frame_width, frame_height)
+        out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (frame_width, frame_height)
     )
 
     # Process video frame by frame
@@ -55,4 +55,4 @@ if uploaded_file:
 
         # Draw pose landmarks and connections
         if results.pose_landmarks:
-            mp_drawing.draw_l
+            mp_drawing.draw_landmarks
