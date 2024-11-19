@@ -60,7 +60,7 @@ if uploaded_file:
             mp_drawing.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
             # Track Y-coordinate of the left hip
-            left_hip = results.pose_landmarks.landmark[mp_pose.PoseLandmark.LEFT_HIP]
+            left_hip = results.pose_landmarks.landmark[mp_pose.PoseLandmark.RIGHT_FOOT_INDEX]
             hip_y_positions.append(left_hip.y)
 
         # Save the frame
