@@ -81,7 +81,7 @@ if uploaded_file:
     fig, ax = plt.subplots(figsize=(10, 5))
     
     # Set threshold and separate big and small jumps
-    big_jump_threshold = 0.10
+    big_jump_threshold = 0.05
     displacements = properties['prominences']
     big_jump_indices = peaks[displacements >= big_jump_threshold]
     small_jump_indices = peaks[displacements < big_jump_threshold]
